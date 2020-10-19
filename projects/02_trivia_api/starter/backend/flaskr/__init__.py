@@ -4,6 +4,7 @@ from flask.globals import current_app
 from flask.json import loads
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from sqlalchemy import func
 import random
 
 from models import setup_db, Question, Category
@@ -55,13 +56,9 @@ def create_app(test_config=None):
       categories[category.id] = category.type
 
     return jsonify({
-      'categories': categories,
+      'success': True,
+      'categories': categories
     })
-
-  
-
-
-
   '''
   @TODO: 
   Create an endpoint to handle GET requests for questions, 
@@ -74,39 +71,29 @@ def create_app(test_config=None):
   ten questions per page and pagination at the bottom of the screen for three pages.
   Clicking on the page numbers should update the questions. 
   '''
-
   @app.route('/questions', methods = ['GET'])
   def get_all_questions():
     questions = Question.query.all()
     all_categoies = Category.query.all()
     current_questions = paginate_questions(request,questions)
     categories = {}
-
     for category in all_categoies:
       categories[category.id] = category.type
-
-
     if len(current_questions) == 0:
       abort(404)
-
     return jsonify({
+      'success': True,
       'questions': current_questions,
-
       'total_questions': len(questions),
-
       'categories': categories
     })
       
-
-
   '''
   @TODO: 
   Create an endpoint to DELETE question using a question ID. 
-
   TEST: When you click the trash icon next to a question, the question will be removed.
   This removal will persist in the database and when you refresh the page. 
   '''
-
   @app.route("/questions/<int:question_id>",methods= ['DELETE'])
   def delete_question(question_id):
     try:
@@ -114,25 +101,20 @@ def create_app(test_config=None):
       if question is None:
         abort(404)
       question.delete()
-
       questions = Question.query.all()
       all_categoies = Category.query.all()
       current_questions = paginate_questions(request,questions)
       categories = {}
-
       for category in all_categoies:
         categories[category.id] = category.type
         return jsonify({
+        'success': True,
         'questions': current_questions,
-
         'total_questions': len(questions),
-
         'categories': categories
       })
     except:
       abort(422)
-
-    
   '''
   @TODO: 
   Create an endpoint to POST a new question, 
@@ -161,10 +143,9 @@ def create_app(test_config=None):
       for category in all_categoies:
         categories[category.id] = category.type
         return jsonify({
+        'success': True,
         'questions': current_questions,
-
         'total_questions': len(questions),
-
         'categories': categories
       })
     except:
@@ -190,6 +171,7 @@ def create_app(test_config=None):
     questions = [question.format() for question in result]
     
     return jsonify({
+      'success': True,
       'questions': questions,
       'total_questions': len(questions)
     })
@@ -213,6 +195,7 @@ def create_app(test_config=None):
       abort(404)
     questions = paginate_questions(request,result)
     return jsonify({
+      'success': True,
       'questions' : questions,
       'total_questions': len(questions),
       'current_category': category.type
@@ -229,7 +212,26 @@ def create_app(test_config=None):
   one question at a time is displayed, the user is allowed to answer
   and shown whether they were correct or not. 
   '''
-
+  @app.route('/play',methods=['POST'])
+  def play():
+    body = request.get_json()
+    
+    category = body.get('quiz_category')
+    print(category)
+    previous_questions = body.get('previous_questions')
+    print(previous_questions)
+    try:
+      if(category.get('id') == 0): #all categories
+        question_within_category = Question.query.filter(Question.question.notin_(previous_questions)).order_by(func.random()).first()
+      else:
+        question_within_category = Question.query.filter(Question.category.ilike(category.get('type'))).filter(Question.id.notin_(previous_questions)).order_by(func.random()).first()
+      
+      return jsonify({
+          'success': True,
+          'question': question_within_category.format()
+        })
+    except:
+      abort(422)
   '''
   @TODO: 
   Create error handlers for all expected errors 
@@ -254,11 +256,16 @@ def create_app(test_config=None):
   @app.errorhandler(400)
   def bad_request(error):
     return jsonify({
-      "success": False, 
-      "error": 400,
-      "message": "bad request"
+      'success': False, 
+      'error': 400,
+      'message': "bad request"
       }), 400
-  
-  return app
 
-    
+  @app.errorhandler(405)
+  def not_found(error):
+    return jsonify({
+      'success': False, 
+      'error': 405,
+      'message': "method not allowed"
+      }), 405
+  return app
