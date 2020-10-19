@@ -131,7 +131,11 @@ def create_app(test_config=None):
     question = body.get('question',None)
     answer = body.get('answer',None)
     category = body.get('category',None)
-    difficulty = body.get('difficulty', 0)
+    difficulty = body.get('difficulty', None)
+
+    print(question,answer,category,difficulty)
+    if  (question is None or answer is None or category is None or difficulty is None) :
+      abort(400)
     try:
       new_question = Question(question,answer,category,difficulty)
       new_question.insert()
@@ -163,11 +167,17 @@ def create_app(test_config=None):
   only question that include that string within their question. 
   Try using the word "title" to start. 
   '''
-  @app.route('/search', methods=['POST'])
+  @app.route('/questions/search', methods=['POST'])
   def search():
     body = request.get_json()
-    search_question = body.get('searchTerm','')
+    search_question = body.get('searchTerm',None)
+    if search_question is None:
+      abort(400)
+
     result = Question.query.filter(Question.question.ilike("%"+search_question+"%")).all()
+    if len(result) == 0:
+      abort(404)
+
     questions = [question.format() for question in result]
     
     return jsonify({
@@ -187,10 +197,8 @@ def create_app(test_config=None):
   '''
   @app.route('/categories/<int:category_id>/questions',methods=['GET'])
   def get_questions_by_category(category_id):
-    category = Category.query.filter_by(id = category_id).one_or_none()
-    if category is None:
-      abort(404)
-    result = Question.query.filter(Question.category.ilike(category.type)).all()
+    current_category = Category.query.filter_by(id = category_id).one_or_none()
+    result = Question.query.filter_by(category = str(category_id)).all()
     if len(result) == 0:
       abort(404)
     questions = paginate_questions(request,result)
@@ -198,7 +206,7 @@ def create_app(test_config=None):
       'success': True,
       'questions' : questions,
       'total_questions': len(questions),
-      'current_category': category.type
+      'current_category': current_category.type
     })
 
   '''
@@ -216,15 +224,15 @@ def create_app(test_config=None):
   def play():
     body = request.get_json()
     
-    category = body.get('quiz_category')
+    category = body.get('category',0)
     print(category)
     previous_questions = body.get('previous_questions')
     print(previous_questions)
     try:
-      if(category.get('id') == 0): #all categories
-        question_within_category = Question.query.filter(Question.question.notin_(previous_questions)).order_by(func.random()).first()
+      if(category == 0): #all categories
+        question_within_category = Question.query.filter(Question.id.notin_(previous_questions)).order_by(func.random()).first()
       else:
-        question_within_category = Question.query.filter(Question.category.ilike(category.get('type'))).filter(Question.id.notin_(previous_questions)).order_by(func.random()).first()
+        question_within_category = Question.query.filter(Question.category == str(category)).filter(Question.id.notin_(previous_questions)).order_by(func.random()).first()
       
       return jsonify({
           'success': True,
