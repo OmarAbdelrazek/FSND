@@ -60,7 +60,7 @@ class TriviaTestCase(unittest.TestCase):
         res = self.client().get('/categories')
         data = json.loads(res.data)
         self.assertEqual(res.status_code, 200)
-        self.assertAlmostEqual(data['success'], True)
+        self.assertEqual(data['success'], True)
         self.assertTrue(data['categories'])
 
 
